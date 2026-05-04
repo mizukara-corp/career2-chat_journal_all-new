@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リダイレクト中...</title>
+  <!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-55JL373');</script>
+<!-- End Google Tag Manager -->
+</head>
+<body>
+    <!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-55JL373"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<script>
+(function() {
+    const BASE_LIFF_URL = "https://liff.line.me/2003655505-A1wBRxrO";
+    const SL = "952b9432a3";
+
+    const params = new URLSearchParams(window.location.search);
+
+    // 1. JSON (dataパラメータ) の作成
+    const dataObj = {
+        library: params.get("library") || "awareness-funnel",
+        library_detail: params.get("library_detail") || "ad_sns",
+        InflowRoute: params.get("InflowRoute") || "汎用流入経路",
+        inflow_campaign_name: params.get("inflow_campaign_name") || params.get("utm_campaign") || "test",
+        inflow_source: params.get("inflow_source") || params.get("utm_source") || "test",
+        inflow_action_type: params.get("inflow_action_type") || "友だち追加",
+        media: params.get("media") || "none",
+        product: params.get("product") || "none",
+        creative: params.get("creative") || "none"
+    };
+
+    // 2. ベースURL作成（SL と JSONをセット）
+    let finalUrl = `${BASE_LIFF_URL}?sl=${encodeURIComponent(SL)}&data=${encodeURIComponent(JSON.stringify(dataObj))}`;
+
+    // 3. 並列（外出し）パラメータを付与
+    const extraKeys = ["uqid", "bid", "media", "product", "target", "creative", "inflow_campaign_name", "inflow_source", "InflowRoute"];
+    extraKeys.forEach(key => {
+        const val = params.get(key);
+        if (val) {
+            finalUrl += `&${key}=${encodeURIComponent(val)}`;
+        }
+    });
+
+    // 4. 即時リダイレクト
+    window.location.replace(finalUrl);
+})();
+</script>
+</body>
+</html>
