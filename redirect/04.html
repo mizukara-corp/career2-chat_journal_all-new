@@ -22,7 +22,49 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     const BASE_LIFF_URL = "https://liff.line.me/2003655505-A1wBRxrO";
     const SL = "952b9432a3";
 
+    // -----------------------------------------------------------
+    // CAPI連携用ヘルパー（PHENIX_LINE-345 で追加）
+    // -----------------------------------------------------------
+    function getCookie(name) {
+        const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const m = document.cookie.match(new RegExp('(^|;)\\s*' + escaped + '\\s*=\\s*([^;]+)'));
+        return m ? decodeURIComponent(m.pop()) : '';
+    }
+
+    // _fbc cookie が空のとき Meta公式仕様 fb.<idx>.<ts>.<fbclid> で手動構築
+    // mizukara.com はトップレベルドメイン → subdomain index = 1
+    function buildFbcFromFbclid(fbclid) {
+        if (!fbclid) return '';
+        return 'fb.1.' + Date.now() + '.' + fbclid;
+    }
+
+    // KUZEN entity 上限 + ペイロード肥大化対策。サロゲートペア破壊回避のためコードポイント単位で切る
+    function clipString(s, maxLen) {
+        return Array.from(String(s || '')).slice(0, maxLen).join('');
+    }
+
+    // event_source_url: 元LP（document.referrer）を優先。なければ redirect URL を使う
+    // 認証パラメータ（user_token / sig 等）を除外し、マーケティング系のみ保持
+    function buildCleanEventSourceUrl() {
+        try {
+            const sourceUrl = document.referrer || window.location.href;
+            const url = new URL(sourceUrl);
+            const allowed = ['fbclid', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+            const cp = new URLSearchParams();
+            allowed.forEach(function(k) {
+                const v = url.searchParams.get(k);
+                if (v) cp.set(k, v);
+            });
+            const qs = cp.toString();
+            return qs ? (url.origin + url.pathname + '?' + qs) : (url.origin + url.pathname);
+        } catch(e) {
+            return window.location.origin + window.location.pathname;
+        }
+    }
+    // -----------------------------------------------------------
+
     const params = new URLSearchParams(window.location.search);
+    const fbclid = params.get("fbclid") || "";
 
     // 1. JSON (dataパラメータ) の作成
     const dataObj = {
@@ -34,14 +76,20 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         inflow_action_type: params.get("inflow_action_type") || "友だち追加",
         media: params.get("media") || "none",
         product: params.get("product") || "none",
-        creative: params.get("creative") || "none"
+        creative: params.get("creative") || "none",
+
+        // ★★★ CAPI連携用パラメータ（PHENIX_LINE-345 で追加） ★★★
+        meta_fbp: clipString(getCookie("_fbp") || params.get("meta_fbp") || "", 200),
+        meta_fbc: clipString(getCookie("_fbc") || params.get("meta_fbc") || buildFbcFromFbclid(fbclid), 200),
+        fbclid: clipString(fbclid, 200),
+        event_source_url: clipString(buildCleanEventSourceUrl(), 500)
     };
 
     // 2. ベースURL作成（SL と JSONをセット）
     let finalUrl = `${BASE_LIFF_URL}?sl=${encodeURIComponent(SL)}&data=${encodeURIComponent(JSON.stringify(dataObj))}`;
 
     // 3. 並列（外出し）パラメータを付与
-    const extraKeys = ["uqid", "bid", "media", "product", "target", "creative", "inflow_campaign_name", "inflow_source", "InflowRoute"];
+    const extraKeys = ["uqid", "bid", "media", "product", "target", "creative", "inflow_campaign_name", "inflow_source", "InflowRoute", "fbclid"];
     extraKeys.forEach(key => {
         const val = params.get(key);
         if (val) {
