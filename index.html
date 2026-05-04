@@ -459,6 +459,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     // CTAリンク動的書き換え（CAPI 4項目を data param に追加）
     // -----------------------------------------------------------
 
+    let lastFinalUrl = null;  // 直前に設定したURL（冪等性チェック用）
+    let scheduledUpdate = false;  // 次フレーム更新がスケジュール済みか
+
     function updateKuzenLinks() {
       const params = new URLSearchParams(window.location.search);
       const fbclid = params.get('fbclid') || '';
@@ -507,7 +510,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       );
 
       ctas.forEach(function(cta) {
-        cta.href = finalUrl;
+        // 冪等性チェック：同じURLなら href 設定をスキップ（MutationObserver無限ループ防止）
+        if (cta.href !== finalUrl) {
+          cta.href = finalUrl;
+        }
 
         // 重複初期化防止
         if (cta.dataset.capiInitialized === 'true') return;
@@ -518,6 +524,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         }, { capture: true });
 
         cta.dataset.capiInitialized = 'true';
+      });
+
+      lastFinalUrl = finalUrl;
+    }
+
+    // requestAnimationFrame で throttle（DOM変更が大量発生してもJSスレッドをブロックしない）
+    function scheduleUpdate() {
+      if (scheduledUpdate) return;
+      scheduledUpdate = true;
+      requestAnimationFrame(function() {
+        scheduledUpdate = false;
+        updateKuzenLinks();
       });
     }
 
@@ -537,25 +555,24 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     // 2. 即時実行（CATSより先に書けるチャンスを逃さない）
     updateKuzenLinks();
 
-    // 3. MutationObserver で DOM変更監視（CATSが書き換えても再書き換え）
-    const observer = new MutationObserver(function() {
-      updateKuzenLinks();
-    });
+    // 3. MutationObserver で DOM変更監視（CTA追加検知のみ。href監視は無限ループ回避のため除外）
+    //    href変更追従は setInterval（次の項目）で対応
+    const observer = new MutationObserver(scheduleUpdate);
     if (document.body) {
       observer.observe(document.body, {
-        childList: true, subtree: true,
-        attributes: true, attributeFilter: ['href']
+        childList: true,
+        subtree: true
       });
     } else {
       document.addEventListener('DOMContentLoaded', function() {
         observer.observe(document.body, {
-          childList: true, subtree: true,
-          attributes: true, attributeFilter: ['href']
+          childList: true,
+          subtree: true
         });
       });
     }
 
-    // 4. 定期再評価（最初の10秒は1秒ごとに再確認 / Pixel発火遅延対策）
+    // 4. 定期再評価（最初の10秒は1秒ごとに再確認 / Pixel発火遅延・CATS書き換え追従）
     let tickCount = 0;
     const ticker = setInterval(function() {
       updateKuzenLinks();
